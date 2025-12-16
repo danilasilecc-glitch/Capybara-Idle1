@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>HTML-bezumie Idle Capybara</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --text:#eef2f7; --muted:#a8b3c7; --card:#1d2333; --border:#2a3247;
+      --accent:#7bd389; --accent2:#7bb3ff; --accent3:#ff7bd3;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:Inter,system-ui,Segoe UI,Arial,sans-serif; color:var(--text);
+      background:
+        radial-gradient(1100px 500px at 10% -10%, #0f1630 0%, #0b0e1c 60%) fixed,
+        radial-gradient(900px 600px at 90% 110%, rgba(123,179,255,.12), rgba(0,0,0,0)) fixed;
+      overflow-x:hidden;
+    }
+    .wrap{position:relative; z-index:1; max-width:980px; margin:0 auto; padding:20px}
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px}
+    h1{margin:0; font-size:24px; font-weight:900; letter-spacing:.2px}
+    .badge{background:var(--accent); color:#0b121f; padding:6px 10px; border-radius:10px; font-weight:800; font-size:12px}
+    .grid2{display:grid; grid-template-columns:1fr; gap:16px}
+    @media(min-width:860px){ .grid2{grid-template-columns: 1.2fr .8fr} }
+    .card{background:linear-gradient(180deg, #13182a 0%, #171d30 100%);
+      border:1px solid var(--border); border-radius:16px; padding:14px;
+      box-shadow:0 10px 30px rgba(0,0,0,.35);}
+    .btn{background:var(--accent); color:#0b121f; border:none; border-radius:14px; padding:14px 18px; font-weight:900;
+      font-size:18px; cursor:pointer; box-shadow:0 4px 0 #58b873;}
+    .btn.secondary{background:#27314c; color:var(--text); border:1px solid var(--border); box-shadow:none}
+    .row{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+    .chip{background:#141a2b; border:1px solid var(--border); padding:10px 12px; border-radius:12px; font-weight:800}
+    .big{font-size:20px}
+    .muted{color:var(--muted)}
+    .input{background:#111730; border:1px solid var(--border); color:var(--text);
+      border-radius:12px; padding:12px 14px; font-size:18px; min-width:120px;}
+    .tap{display:flex; align-items:center; justify-content:center;
+      background:linear-gradient(180deg, #202743 0%, #151a30 100%);
+      border:1px solid var(--border); border-radius:16px; min-height:240px; position:relative; overflow:hidden;}
+    .capy{font-size:76px; filter:drop-shadow(0 6px 14px rgba(0,0,0,.4)); transition: transform .06s ease;}
+    .tap:active .capy{ transform:scale(0.96) }
+    .pulse{position:absolute; width:140px; height:140px; border-radius:50%;
+      background:radial-gradient(closest-side, rgba(123,179,255,.45), rgba(123,179,255,0));
+      animation: pulse 0.8s ease-out;}
+    @keyframes pulse{from{transform:scale(.3); opacity:.8} to{transform:scale(1.2); opacity:0}}
+    .shop-item{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px;
+      border-radius:12px; border:1px solid var(--border); background:#12172a;}
+    .shop-item + .shop-item{margin-top:10px}
+    footer{margin-top:14px; font-size:12px; color:var(--muted); text-align:center}
+    /* Модалка достижений */
+    #achievementsModal{display:none; position:fixed; top:10%; left:10%; width:80%; height:80%;
+      background:#1d2333; border:2px solid var(--border); border-radius:16px;
+      padding:20px; z-index:1000; overflow-y:auto; color:var(--text);}
+    #achievementToast{display:none; position:fixed; top:0; left:50%; transform:translateX(-50%);
+      background:var(--accent2); color:#0b121f; padding:12px 20px;
+      border-radius:0 0 12px 12px; font-weight:800; z-index:2000;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="row">
+        <h1>HTML-bezumie Idle Capybara</h1>
+        <span class="badge">v2</span>
+      </div>
+      <div class="row">
+        <button id="achievementsBtn" class="btn secondary">🏆</button>
+        <button id="resetBtn" class="btn secondary">Сбросить прогресс</button>
+      </div>
+    </header>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="row" style="margin-bottom:10px">
+          <span class="chip big">Баланс: <span id="balance">0</span></span>
+          <span class="chip">Доход/сек: <span id="pps">0</span></span>
+          <span class="chip">Клики: <span id="clicks">0</span></span>
+        </div>
+        <div class="tap" id="tapArea"><div class="capy" id="capy">🐹</div></div>
+        <div class="row" style="margin-top:12px"><button id="saveBtn" class="btn secondary">Сохранить</button></div>
+        <p class="muted" id="hint" style="margin-top:8px">Жми на капибару 🐹 — получай очки. Покупай апгрейды — капибара фармит сама.</p>
+      </div>
+
+      <div class="card">
+        <div class="row" style="margin-bottom:10px">
+          <span class="chip">Клик: +<span id="perClick">1</span></span>
+          <span class="chip">Авто: +<span id="perSec">0</span>/сек</span>
+        </div>
+        <div id="shop">
+          <!-- Базовые апгрейды -->
+          <div class="shop-item">
+            <div class="meta"><div class="title">Палочка удачи ✨</div><div class="desc">+1 к доходу за клик.</div></div>
+            <div class="act"><span class="price" id="priceClick">Цена: 10</span><button class="btn" id="buyClick">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Маленькая ферма 🌿</div><div class="desc">+1 очко/сек.</div></div>
+            <div class="act"><span class="price" id="priceAuto1">Цена: 25</span><button class="btn" id="buyAuto1">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Большая ферма 🏡</div><div class="desc">+10 очков/сек.</div></div>
+            <div class="act"><span class="price" id="priceAuto2">Цена: 400</span><button class="btn" id="buyAuto2">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Капибара‑пати 🎉</div><div class="desc">Множитель дохода ×1.1.</div></div>
+            <div class="act"><span class="price" id="priceMult">Цена: 1000</span><button class="btn" id="buyMult">Купить</button></div>
+          </div>
+
+          <!-- Дополнительные авто-апгрейды -->
+          <div class="shop-item">
+            <div class="meta"><div class="title">Средняя ферма 🌾</div><div class="desc">+50 очков/сек.</div></div>
+            <div class="act"><span class="price" id="priceAuto3">Цена: 2 500</span><button class="btn" id="buyAuto3">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Ранчо 🐮</div><div class="desc">+250 очков/сек.</div></div>
+            <div class="act"><span class="price" id="priceAuto4">Цена: 15 000</span><button class="btn" id="buyAuto4">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Завод ⚙️</div><div class="desc">+1 000 очков/сек.</div></div>
+            <div class="act"><span class="price" id="priceAuto5">Цена: 100 000</span><button class="btn" id="buyAuto5">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Город 🌆</div><div class="desc">+5 000 очков/сек.</div></div>
+            <div class="act"><span class="price" id="priceAuto6">Цена: 600 000</span><button class="btn" id="buyAuto6">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Мегаполис 🏙️</div><div class="desc">+25 000 очков/сек.</div></div>
+            <div class="act"><span class="price" id="priceAuto7">Цена: 3 000 000</span><button class="btn" id="buyAuto7">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Империя 👑</div><div class="desc">+100 000 очков/сек.</div></div>
+            <div class="act"><span class="price" id="priceAuto8">Цена: 15 000 000</span><button class="btn" id="buyAuto8">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Галактическая ферма 🚀</div><div class="desc">+500 000 очков/сек.</div></div>
+            <div class="act"><span class="price" id="priceAuto9">Цена: 80 000 000</span><button class="btn" id="buyAuto9">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Межмерная ферма 🌀</div><div class="desc">+2 500 000 очков/сек.</div></div>
+            <div class="act"><span class="price" id="priceAuto10">Цена: 400 000 000</span><button class="btn" id="buyAuto10">Купить</button></div>
+          </div>
+
+          <!-- Дополнительные множители -->
+          <div class="shop-item">
+            <div class="meta"><div class="title">Капибара‑фестиваль 🎪</div><div class="desc">Множитель дохода ×1.1.</div></div>
+            <div class="act"><span class="price" id="priceMult2">Цена: 5 000</span><button class="btn" id="buyMult2">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Золотая капибара 🪙</div><div class="desc">Множитель дохода ×1.1.</div></div>
+            <div class="act"><span class="price" id="priceMult3">Цена: 50 000</span><button class="btn" id="buyMult3">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Парад капибар 🥁</div><div class="desc">Множитель дохода ×1.1.</div></div>
+            <div class="act"><span class="price" id="priceMult4">Цена: 500 000</span><button class="btn" id="buyMult4">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Орден капибар 🛡️</div><div class="desc">Множитель дохода ×1.1.</div></div>
+            <div class="act"><span class="price" id="priceMult5">Цена: 5 000 000</span><button class="btn" id="buyMult5">Купить</button></div>
+          </div>
+
+          <div class="shop-item">
+            <div class="meta"><div class="title">Мифическая капибара ✨</div><div class="desc">Множитель дохода ×1.1.</div></div>
+            <div class="act"><span class="price" id="priceMult6">Цена: 50 000 000</span><button class="btn" id="buyMult6">Купить</button></div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <label class="muted">Автосохранение каждые</label>
+          <input id="autosaveSec" class="input" type="number" min="5" step="5" value="15" />
+          <span class="muted">сек</span>
+        </div>
+      </div>
+    </div>
+
+    <footer>Неоновый фон с партиклами, чистый HTML/CSS/JS, локальные сохранения.</footer>
+  </div>
+
+  <!-- Модалка достижений -->
+  <div id="achievementsModal">
+    <h2>Достижения</h2>
+    <ul id="achievementsList"></ul>
+    <button class="btn secondary" onclick="closeAchievements()">Закрыть</button>
+  </div>
+  <!-- Всплывающее уведомление -->
+  <div id="achievementToast"></div>
+
+  <script>
+    const state = {
+      balance: 0,
+      perClickBase: 1,
+      perSecBase: 0,
+      clickUpgrades: 0,
+      auto1: 0,
+      auto2: 0,
+      // Новые авто-апгрейды:
+      auto3: 0,
+      auto4: 0,
+      auto5: 0,
+      auto6: 0,
+      auto7: 0,
+      auto8: 0,
+      auto9: 0,
+      auto10: 0,
+      // Множители — общий счёт
+      multCount: 0,
+      clicks: 0,
+      autosaveSec: 15
+    };
+
+    const el = {
+      balance: document.getElementById('balance'),
+      pps: document.getElementById('pps'),
+      clicks: document.getElementById('clicks'),
+      perClick: document.getElementById('perClick'),
+      perSec: document.getElementById('perSec'),
+      priceClick: document.getElementById('priceClick'),
+      priceAuto1: document.getElementById('priceAuto1'),
+      priceAuto2: document.getElementById('priceAuto2'),
+      priceAuto3: document.getElementById('priceAuto3'),
+      priceAuto4: document.getElementById('priceAuto4'),
+      priceAuto5: document.getElementById('priceAuto5'),
+      priceAuto6: document.getElementById('priceAuto6'),
+      priceAuto7: document.getElementById('priceAuto7'),
+      priceAuto8: document.getElementById('priceAuto8'),
+      priceAuto9: document.getElementById('priceAuto9'),
+      priceAuto10: document.getElementById('priceAuto10'),
+      priceMult: document.getElementById('priceMult'),
+      priceMult2: document.getElementById('priceMult2'),
+      priceMult3: document.getElementById('priceMult3'),
+      priceMult4: document.getElementById('priceMult4'),
+      priceMult5: document.getElementById('priceMult5'),
+      priceMult6: document.getElementById('priceMult6'),
+      tapArea: document.getElementById('tapArea'),
+      resetBtn: document.getElementById('resetBtn'),
+      saveBtn: document.getElementById('saveBtn'),
+      autosaveSec: document.getElementById('autosaveSec'),
+    };
+
+    function getPrices(){
+      return {
+        // Клик
+        click: Math.floor(10 * Math.pow(1.25, state.clickUpgrades)),
+        // Авто-апгрейды
+        auto1: Math.floor(25 * Math.pow(1.22, state.auto1)),
+        auto2: Math.floor(400 * Math.pow(1.18, state.auto2)),
+        auto3: Math.floor(2500 * Math.pow(1.16, state.auto3)),
+        auto4: Math.floor(15000 * Math.pow(1.16, state.auto4)),
+        auto5: Math.floor(100000 * Math.pow(1.14, state.auto5)),
+        auto6: Math.floor(600000 * Math.pow(1.14, state.auto6)),
+        auto7: Math.floor(3000000 * Math.pow(1.12, state.auto7)),
+        auto8: Math.floor(15000000 * Math.pow(1.12, state.auto8)),
+        auto9: Math.floor(80000000 * Math.pow(1.10, state.auto9)),
+        auto10: Math.floor(400000000 * Math.pow(1.10, state.auto10)),
+        // Множители: все используют общий счетчик multCount
+        mult: Math.floor(1000 * Math.pow(1.35, state.multCount)),
+        mult2: Math.floor(5000 * Math.pow(1.35, state.multCount)),
+        mult3: Math.floor(50000 * Math.pow(1.35, state.multCount)),
+        mult4: Math.floor(500000 * Math.pow(1.35, state.multCount)),
+        mult5: Math.floor(5000000 * Math.pow(1.35, state.multCount)),
+        mult6: Math.floor(50000000 * Math.pow(1.35, state.multCount)),
+      };
+    }
+
+    function getMultiplier(){ return Math.pow(1.1, state.multCount); }
+
+    function incomePerClick(){
+      return Math.floor((state.perClickBase + state.clickUpgrades) * getMultiplier());
+    }
+
+    function incomePerSec(){
+      const autoGain =
+        state.auto1 * 1 +
+        state.auto2 * 10 +
+        state.auto3 * 50 +
+        state.auto4 * 250 +
+        state.auto5 * 1000 +
+        state.auto6 * 5000 +
+        state.auto7 * 25000 +
+        state.auto8 * 100000 +
+        state.auto9 * 500000 +
+        state.auto10 * 2500000;
+      return Math.floor((state.perSecBase + autoGain) * getMultiplier());
+    }
+
+    function render(){
+      el.balance.textContent = state.balance.toLocaleString('ru-RU');
+      el.clicks.textContent = state.clicks;
+      el.perClick.textContent = incomePerClick();
+      el.perSec.textContent = incomePerSec();
+      el.pps.textContent = incomePerSec();
+
+      const p = getPrices();
+      el.priceClick.textContent  = 'Цена: ' + p.click.toLocaleString('ru-RU');
+      el.priceAuto1.textContent  = 'Цена: ' + p.auto1.toLocaleString('ru-RU');
+      el.priceAuto2.textContent  = 'Цена: ' + p.auto2.toLocaleString('ru-RU');
+      el.priceAuto3.textContent  = 'Цена: ' + p.auto3.toLocaleString('ru-RU');
+      el.priceAuto4.textContent  = 'Цена: ' + p.auto4.toLocaleString('ru-RU');
+      el.priceAuto5.textContent  = 'Цена: ' + p.auto5.toLocaleString('ru-RU');
+      el.priceAuto6.textContent  = 'Цена: ' + p.auto6.toLocaleString('ru-RU');
+      el.priceAuto7.textContent  = 'Цена: ' + p.auto7.toLocaleString('ru-RU');
+      el.priceAuto8.textContent  = 'Цена: ' + p.auto8.toLocaleString('ru-RU');
+      el.priceAuto9.textContent  = 'Цена: ' + p.auto9.toLocaleString('ru-RU');
+      el.priceAuto10.textContent = 'Цена: ' + p.auto10.toLocaleString('ru-RU');
+
+      el.priceMult.textContent  = 'Цена: ' + p.mult.toLocaleString('ru-RU');
+      el.priceMult2.textContent = 'Цена: ' + p.mult2.toLocaleString('ru-RU');
+      el.priceMult3.textContent = 'Цена: ' + p.mult3.toLocaleString('ru-RU');
+      el.priceMult4.textContent = 'Цена: ' + p.mult4.toLocaleString('ru-RU');
+      el.priceMult5.textContent = 'Цена: ' + p.mult5.toLocaleString('ru-RU');
+      el.priceMult6.textContent = 'Цена: ' + p.mult6.toLocaleString('ru-RU');
+
+      el.autosaveSec.value = state.autosaveSec;
+
+      checkAchievements();
+    }
+
+    const KEY = 'capy_idle_save_v2';
+    function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+    function load(){
+      const raw = localStorage.getItem(KEY);
+      if(!raw) return;
+      try{ Object.assign(state, JSON.parse(raw)); }catch(e){}
+    }
+    function reset(){
+      localStorage.removeItem(KEY);
+      Object.assign(state,{
+        balance:0, perClickBase:1, perSecBase:0, clickUpgrades:0,
+        auto1:0, auto2:0, auto3:0, auto4:0, auto5:0, auto6:0, auto7:0, auto8:0, auto9:0, auto10:0,
+        multCount:0, clicks:0, autosaveSec:15
+      });
+      render();
+    }
+
+    function tap(x,y){
+      const gain = incomePerClick();
+      state.balance += gain;
+      state.clicks++;
+      spawnPulse(x,y);
+      render();
+    }
+    function spawnPulse(x,y){
+      const p = document.createElement('div');
+      p.className = 'pulse';
+      p.style.left = (x - 70) + 'px';
+      p.style.top  = (y - 70) + 'px';
+      el.tapArea.appendChild(p);
+      setTimeout(()=>p.remove(), 800);
+    }
+
+    let autoTimer = null;
+    function startAuto(){
+      if(autoTimer) clearInterval(autoTimer);
+      autoTimer = setInterval(()=>{
+        state.balance += incomePerSec();
+        render();
+      }, 1000);
+    }
+
+    let autosaveTimer = null;
+    function startAutosave(){
+      if(autosaveTimer) clearInterval(autosaveTimer);
+      autosaveTimer = setInterval(save, Math.max(5, state.autosaveSec) * 1000);
+    }
+
+    function tryBuy(type){
+      const prices = getPrices();
+      const price = prices[type];
+      if(state.balance < price) return;
+      state.balance -= price;
+
+      if(type === 'click') state.clickUpgrades++;
+
+      // Авто-апгрейды
+      if(type === 'auto1') state.auto1++;
+      if(type === 'auto2') state.auto2++;
+      if(type === 'auto3') state.auto3++;
+      if(type === 'auto4') state.auto4++;
+      if(type === 'auto5') state.auto5++;
+      if(type === 'auto6') state.auto6++;
+      if(type === 'auto7') state.auto7++;
+      if(type === 'auto8') state.auto8++;
+      if(type === 'auto9') state.auto9++;
+      if(type === 'auto10') state.auto10++;
+
+      // Любая покупка множителя увеличивает общий multCount
+      if(type === 'mult'  || type === 'mult2' || type === 'mult3' ||
+         type === 'mult4' || type === 'mult5' || type === 'mult6') {
+        state.multCount++;
+      }
+
+      render(); save();
+    }
+
+    // Интеракции
+    el.tapArea.addEventListener('click', (e)=>{
+      const rect = el.tapArea.getBoundingClientRect();
+      tap(e.clientX - rect.left, e.clientY - rect.top);
+    });
+    el.tapArea.addEventListener('touchstart', (e)=>{
+      const t = e.touches[0];
+      const rect = el.tapArea.getBoundingClientRect();
+      tap(t.clientX - rect.left, t.clientY - rect.top);
+      e.preventDefault();
+    }, {passive:false});
+
+    document.getElementById('buyClick').addEventListener('click', ()=>tryBuy('click'));
+
+    // Авто-апгрейды
+    document.getElementById('buyAuto1').addEventListener('click', ()=>tryBuy('auto1'));
+    document.getElementById('buyAuto2').addEventListener('click', ()=>tryBuy('auto2'));
+    document.getElementById('buyAuto3').addEventListener('click', ()=>tryBuy('auto3'));
+    document.getElementById('buyAuto4').addEventListener('click', ()=>tryBuy('auto4'));
+    document.getElementById('buyAuto5').addEventListener('click', ()=>tryBuy('auto5'));
+    document.getElementById('buyAuto6').addEventListener('click', ()=>tryBuy('auto6'));
+    document.getElementById('buyAuto7').addEventListener('click', ()=>tryBuy('auto7'));
+    document.getElementById('buyAuto8').addEventListener('click', ()=>tryBuy('auto8'));
+    document.getElementById('buyAuto9').addEventListener('click', ()=>tryBuy('auto9'));
+    document.getElementById('buyAuto10').addEventListener('click', ()=>tryBuy('auto10'));
+
+    // Множители
+    document.getElementById('buyMult').addEventListener('click', ()=>tryBuy('mult'));
+    document.getElementById('buyMult2').addEventListener('click', ()=>tryBuy('mult2'));
+    document.getElementById('buyMult3').addEventListener('click', ()=>tryBuy('mult3'));
+    document.getElementById('buyMult4').addEventListener('click', ()=>tryBuy('mult4'));
+    document.getElementById('buyMult5').addEventListener('click', ()=>tryBuy('mult5'));
+    document.getElementById('buyMult6').addEventListener('click', ()=>tryBuy('mult6'));
+
+    el.saveBtn.addEventListener('click', ()=>{ save(); render(); });
+    document.getElementById('resetBtn').addEventListener('click', ()=>{
+      if(confirm('Сбросить прогресс?')){ reset(); save(); }
+    });
+    el.autosaveSec.addEventListener('change', ()=>{
+      const v = parseInt(el.autosaveSec.value||'15',10);
+      state.autosaveSec = Math.max(5, v);
+      startAutosave(); save(); render();
+    });
+
+    // --- Достижения ---
+    const achievements = [
+      {id:'click1000', name:'Клик‑мастер', desc:'Сделать 1000 кликов', check:()=>state.clicks>=1000},
+      {id:'balance10000', name:'Фермер капибар', desc:'Достичь баланса 10 000', check:()=>state.balance>=10000},
+      {id:'auto10', name:'Автоматизация', desc:'Купить 10 маленьких ферм', check:()=>state.auto1>=10},
+    ];
+    let unlocked = JSON.parse(localStorage.getItem('capy_achievements')||'[]');
+
+    function showToast(text){
+      const toast = document.getElementById('achievementToast');
+      toast.textContent = text;
+      toast.style.display='block';
+      setTimeout(()=>toast.style.display='none', 4000);
+    }
+
+    function checkAchievements(){
+      achievements.forEach(a=>{
+        if(!unlocked.includes(a.id) && a.check()){
+          unlocked.push(a.id);
+          localStorage.setItem('capy_achievements', JSON.stringify(unlocked));
+          showToast(`Вы выполнили достижение "${a.name}"`);
+        }
+      });
+    }
+
+    function openAchievements(){
+      const modal = document.getElementById('achievementsModal');
+      const list = document.getElementById('achievementsList');
+      list.innerHTML='';
+      achievements.forEach(a=>{
+        const li = document.createElement('li');
+        const done = unlocked.includes(a.id);
+        li.textContent = `${a.name} — ${a.desc} ${done?'✅':'❌'}`;
+        list.appendChild(li);
+      });
+      modal.style.display='block';
+    }
+    function closeAchievements(){
+      document.getElementById('achievementsModal').style.display='none';
+    }
+    document.getElementById('achievementsBtn').addEventListener('click', openAchievements);
+
+    // --- Запуск ---
+    load();
+    render();
+    startAuto();
+    startAutosave();
+  </script>
+</body>
+</html>
